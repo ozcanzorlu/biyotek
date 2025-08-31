@@ -2,44 +2,70 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Cilt Kanseri Tahmin Sistemi</title>
+    <title>Deri Hastalıkları Yapay Zeka Tespit Sistemi</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 
-    <div class="container py-5">
-        <div class="card shadow-lg">
-            <div class="card-body text-center">
-                <h1 class="mb-4 text-primary">🩺 Cilt Kanseri Tahmin Sistemi</h1>
+<div class="container-fluid p-4">
+    <h2 class="text-center mb-4 text-primary">🩺 Deri Hastalıkları Yapay Zeka Tespit ve Bilgilendirme Sistemi</h2>
+    
+    <form method="POST" enctype="multipart/form-data">
+        <div class="row">
 
-                <!-- Form -->
-                <form method="POST" enctype="multipart/form-data" class="mb-4">
-                    <div class="input-group mb-3">
-                        <input type="file" name="file" class="form-control" required>
-                        <button type="submit" class="btn btn-success">Tahmin Et</button>
+            <!-- Görüntü Yükle -->
+            <div class="col-md-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h4>📷 Görüntü Yükle</h4>
+                        <input type="file" name="file" class="form-control mb-2" required>
                     </div>
-                </form>
-
-                <!-- Sonuç -->
-                {% if prediction %}
-                <div class="alert alert-info">
-                    <h4>Tahmin: {{ prediction }}</h4>
-                    {% if confidence %}
-                    <p>Güven Oranı: {{ confidence }}%</p>
-                    {% endif %}
                 </div>
-
-                <!-- Görsel -->
-                {% if img_path %}
-                <div class="mt-3">
-                    <h5>Yüklenen Görsel:</h5>
-                    <img src="{{ img_path }}" alt="Yüklenen Görsel" class="img-thumbnail" width="250">
-                </div>
-                {% endif %}
-                {% endif %}
             </div>
+
+            <!-- Genetik Bilgi -->
+            <div class="col-md-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <h4>🧬 Genetik Bilgi Girişi</h4>
+                        <label>Aile Öyküsü:</label><br>
+                        <input type="radio" name="family_history" value="Evet"> Evet
+                        <input type="radio" name="family_history" value="Hayır" checked> Hayır
+                        <br><br>
+
+                        <label>Risk Faktörleri:</label><br>
+                        <input type="checkbox" name="risk_factors" value="uv"> UV Maruziyeti <br>
+                        <input type="checkbox" name="risk_factors" value="open_skin"> Açık Ten <br>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sonuçlar -->
+            <div class="col-md-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body text-center">
+                        <h4>📊 Sonuçlar</h4>
+                        {% if prediction %}
+                        <div class="alert alert-info">
+                            <b>Tahmin:</b> {{ prediction }} <br>
+                            <b>Güven Oranı:</b> {{ confidence }}% <br>
+                            <b>Risk Skoru:</b> {{ risk_score }}%
+                        </div>
+                        {% if img_path %}
+                        <img src="{{ img_path }}" class="img-thumbnail mt-2" width="200">
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
         </div>
-    </div>
+
+        <div class="text-center mt-3">
+            <button type="submit" class="btn btn-success btn-lg">Sonuç Al</button>
+        </div>
+    </form>
+</div>
 
 </body>
 </html>
