@@ -17,7 +17,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def predict_image(img_path):
-    img = Image.open(img_path).resize((64, 64))  # model giriş boyutu
+    img = Image.open(img_path).resize((128, 128))  # Model giriş boyutu 128x128
     img_array = np.array(img).astype('float32') / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
@@ -25,7 +25,6 @@ def predict_image(img_path):
     interpreter.invoke()
     prediction = interpreter.get_tensor(output_details[0]['index'])
     return np.argmax(prediction), float(np.max(prediction))
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
