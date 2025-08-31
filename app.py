@@ -6,22 +6,29 @@ import os
 
 app = Flask(__name__)
 
-# TFLite modeli yükle
+# TFLite modelini yükle
 interpreter = tf.lite.Interpreter(model_path="skin_cancer_cnn.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# Modele göre giriş boyutunu otomatik al
-input_shape = input_details[0]['shape']  # örn. [1,128,128,3]
+# Modele göre giriş boyutu
+input_shape = input_details[0]['shape']
 IMG_HEIGHT, IMG_WIDTH = input_shape[1], input_shape[2]
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# HAM10000 sınıfları (7 adet)
-classes = ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']
-
+# 7 sınıfın Türkçe karşılıkları ve açıklamaları
+classes = {
+    'akiec': "Aktinik keratoz / Bowen hastalığı - Ciltte güneşe bağlı yüzeysel tümör",
+    'bcc': "Bazal Hücreli Karsinom - En sık görülen, genellikle yavaş ilerleyen cilt kanseri",
+    'bkl': "Benign Keratoz - İyi huylu deri lezyonu",
+    'df': "Dermatofibroma - Zararsız, küçük ve sert deri nodülü",
+    'mel': "Melanom - Tehlikeli ve hızlı yayılabilen cilt kanseri",
+    'nv': "Melanositik Nevüs (Ben) - Çoğunlukla iyi huylu benler",
+    'vasc': "Vasküler Lezyon - Damar kaynaklı lezyon (ör: hemanjiyom)"
+}
 
 def predict_image(img_path):
     img = Image.open(img_path).resize((IMG_WIDTH, IMG_HEIGHT))
@@ -33,7 +40,6 @@ def predict_image(img_path):
     prediction = interpreter.get_tensor(output_details[0]['index'])
     return np.argmax(prediction), float(np.max(prediction))
 
-
 @app.route('/', methods=['GET', 'POST'])
 def index():
     prediction = None
@@ -41,31 +47,27 @@ def index():
     img_path = None
 
     if request.method == 'POST':
-        if 'file' not in request.files:
-            return render_template('index.html', prediction="Dosya bulunamadı!")
-
         file = request.files['file']
-        if file.filename == '':
-            return render_template('index.html', prediction="Dosya seçilmedi!")
+        if file and file.filename != '':
+            file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+            file.save(file_path)
 
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        file.save(file_path)
+            result, conf = predict_image(file_path)
 
-        result, conf = predict_image(file_path)
-
-        # Index model çıktısında mevcut mu diye kontrol
-        if result < len(classes):
-            prediction = classes[result]
-            confidence = round(conf * 100, 2)
-            img_path = file_path
-        else:
-            prediction = f"Geçersiz sınıf indexi: {result}"
+            # index → class kodu
+            class_codes = list(classes.keys())
+            if result < len(class_codes):
+                code = class_codes[result]
+                prediction = classes[code]   # Türkçe açıklamalı
+                confidence = round(conf * 100, 2)
+                img_path = file_path
+            else:
+                prediction = f"Geçersiz sınıf indexi: {result}"
 
     return render_template('index.html',
                            prediction=prediction,
                            confidence=confidence,
                            img_path=img_path)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
