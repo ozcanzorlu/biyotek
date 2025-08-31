@@ -6,18 +6,22 @@ import os
 
 app = Flask(__name__)
 
-# TFLite modeli yükle
+# Model yükle
 interpreter = tf.lite.Interpreter(model_path="skin_cancer_cnn.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
+
+# Modelin beklediği giriş boyutunu otomatik al
+input_shape = input_details[0]['shape']  # örn. [1,128,128,3]
+IMG_HEIGHT, IMG_WIDTH = input_shape[1], input_shape[2]
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def predict_image(img_path):
-    img = Image.open(img_path).resize((128, 128))  # Model giriş boyutu 128x128
+    img = Image.open(img_path).resize((IMG_WIDTH, IMG_HEIGHT))  # modele göre boyutlandır
     img_array = np.array(img).astype('float32') / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
@@ -25,6 +29,7 @@ def predict_image(img_path):
     interpreter.invoke()
     prediction = interpreter.get_tensor(output_details[0]['index'])
     return np.argmax(prediction), float(np.max(prediction))
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
