@@ -6,22 +6,25 @@ import os
 
 app = Flask(__name__)
 
-# Model yükle
+# TFLite modeli yükle
 interpreter = tf.lite.Interpreter(model_path="skin_cancer_cnn.tflite")
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# Modelin beklediği giriş boyutunu otomatik al
+# Modele göre giriş boyutunu otomatik al
 input_shape = input_details[0]['shape']  # örn. [1,128,128,3]
 IMG_HEIGHT, IMG_WIDTH = input_shape[1], input_shape[2]
 
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# HAM10000 sınıfları (7 adet)
+classes = ['akiec', 'bcc', 'bkl', 'df', 'mel', 'nv', 'vasc']
+
 
 def predict_image(img_path):
-    img = Image.open(img_path).resize((IMG_WIDTH, IMG_HEIGHT))  # modele göre boyutlandır
+    img = Image.open(img_path).resize((IMG_WIDTH, IMG_HEIGHT))
     img_array = np.array(img).astype('float32') / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
@@ -50,10 +53,13 @@ def index():
 
         result, conf = predict_image(file_path)
 
-        classes = ["Benign", "Kötü huylu (Melanom)"]  # kendi sınıflarını buraya yaz
-        prediction = classes[result]
-        confidence = round(conf * 100, 2)
-        img_path = file_path
+        # Index model çıktısında mevcut mu diye kontrol
+        if result < len(classes):
+            prediction = classes[result]
+            confidence = round(conf * 100, 2)
+            img_path = file_path
+        else:
+            prediction = f"Geçersiz sınıf indexi: {result}"
 
     return render_template('index.html',
                            prediction=prediction,
