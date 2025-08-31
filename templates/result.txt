@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tahmin Sonucu</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Tahmin Sonucu</h1>
+    <img src="{{ img_path }}" alt="Uploaded Image" width="300"><br><br>
+    <h2>📌 Modelin Tahmini: <span style="color:green">{{ predicted_class }}</span></h2>
+    <h3>Güven Oranı: %{{ confidence }}</h3>
+
+    <a href="/">Yeni Resim Yükle</a>
+</body>
+</html>
