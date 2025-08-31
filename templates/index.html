@@ -20,19 +20,22 @@
                     </div>
                 </form>
 
-                <!-- Sonuç alanı -->
+                <!-- Sonuç -->
                 {% if prediction %}
                 <div class="alert alert-info">
-                    <h4 class="alert-heading">Tahmin Sonucu:</h4>
-                    <p class="mb-1"><b>{{ prediction }}</b></p>
-                    <p>Güven Oranı: <b>{{ confidence }}%</b></p>
+                    <h4>Tahmin: {{ prediction }}</h4>
+                    {% if confidence %}
+                    <p>Güven Oranı: {{ confidence }}%</p>
+                    {% endif %}
                 </div>
 
-                <!-- Yüklenen Görsel -->
+                <!-- Görsel -->
+                {% if img_path %}
                 <div class="mt-3">
                     <h5>Yüklenen Görsel:</h5>
-                    <img src="{{ img_path }}" alt="Yüklenen Görsel" class="img-thumbnail" width="300">
+                    <img src="{{ img_path }}" alt="Yüklenen Görsel" class="img-thumbnail" width="250">
                 </div>
+                {% endif %}
                 {% endif %}
             </div>
         </div>
