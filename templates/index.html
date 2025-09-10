@@ -2,70 +2,109 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Deri Hastalıkları Yapay Zeka Tespit Sistemi</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Deri Sağlığı Analiz Sistemi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
+<div class="container py-5">
+    <h2 class="text-center mb-4">🧠 Yapay Zeka Destekli Deri Sağlığı Analizi</h2>
 
-<div class="container-fluid p-4">
-    <h2 class="text-center mb-4 text-primary">🩺 Deri Hastalıkları Yapay Zeka Tespit ve Bilgilendirme Sistemi</h2>
-    
-    <form method="POST" enctype="multipart/form-data">
-        <div class="row">
-
-            <!-- Görüntü Yükle -->
-            <div class="col-md-4">
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body">
-                        <h4>📷 Görüntü Yükle</h4>
-                        <input type="file" name="file" class="form-control mb-2" required>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Genetik Bilgi -->
-            <div class="col-md-4">
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body">
-                        <h4>🧬 Genetik Bilgi Girişi</h4>
-                        <label>Aile Öyküsü:</label><br>
-                        <input type="radio" name="family_history" value="Evet"> Evet
-                        <input type="radio" name="family_history" value="Hayır" checked> Hayır
-                        <br><br>
-
-                        <label>Risk Faktörleri:</label><br>
-                        <input type="checkbox" name="risk_factors" value="uv"> UV Maruziyeti <br>
-                        <input type="checkbox" name="risk_factors" value="open_skin"> Açık Ten <br>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sonuçlar -->
-            <div class="col-md-4">
-                <div class="card shadow-sm mb-3">
-                    <div class="card-body text-center">
-                        <h4>📊 Sonuçlar</h4>
-                        {% if prediction %}
-                        <div class="alert alert-info">
-                            <b>Tahmin:</b> {{ prediction }} <br>
-                            <b>Güven Oranı:</b> {{ confidence }}% <br>
-                            <b>Risk Skoru:</b> {{ risk_score }}%
-                        </div>
-                        {% if img_path %}
-                        <img src="{{ img_path }}" class="img-thumbnail mt-2" width="200">
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
+    <!-- FORM -->
+    <form method="POST" enctype="multipart/form-data" class="card p-4 shadow">
+        <!-- Fotoğraf -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">📸 Fotoğraf Yükle</label>
+            <input type="file" name="file" class="form-control" required>
         </div>
 
-        <div class="text-center mt-3">
-            <button type="submit" class="btn btn-success btn-lg">Sonuç Al</button>
+        <!-- Yaş -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">🎂 Yaş</label>
+            <input type="number" name="age" class="form-control" placeholder="Örn: 35" min="1" max="120" required>
         </div>
+
+        <!-- Cilt Tipi -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">🌞 Cilt Tipi</label>
+            <select name="skin_type" class="form-select" required>
+                <option value="">Seçiniz</option>
+                <option value="1">Tip I - Çok açık ten</option>
+                <option value="2">Tip II - Açık ten</option>
+                <option value="3">Tip III - Buğday ten</option>
+                <option value="4">Tip IV - Esmer ten</option>
+                <option value="5">Tip V - Koyu esmer</option>
+                <option value="6">Tip VI - Çok koyu ten</option>
+            </select>
+        </div>
+
+        <!-- Aile öyküsü -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">👨‍👩‍👧‍👦 Aile Öyküsü</label>
+            <select name="family_history" class="form-select" required>
+                <option value="">Seçiniz</option>
+                <option value="yes">Evet</option>
+                <option value="no">Hayır</option>
+            </select>
+        </div>
+
+        <!-- Ek riskler -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">⚠️ Ek Risk Faktörleri:</label><br>
+            <input type="checkbox" name="risk_factors" value="uv"> Yoğun güneş maruziyeti<br>
+            <input type="checkbox" name="risk_factors" value="open_skin"> Açık havada çalışma (tarım, inşaat vb.)
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">🔍 Analiz Et</button>
     </form>
-</div>
 
+    <!-- SONUÇLAR -->
+    {% if prediction %}
+    <div class="mt-5 card p-4 shadow">
+        <h4>🔬 Analiz Sonuçları</h4>
+
+        {% if img_path %}
+        <div class="mb-3">
+            <h6>📸 Yüklenen Fotoğraf:</h6>
+            <img src="{{ img_path }}" class="img-fluid rounded" style="max-height:200px;">
+        </div>
+        {% endif %}
+
+        <p><strong>📋 Tahmin:</strong> {{ prediction }}</p>
+        <p><strong>🎯 Model Güveni:</strong> %{{ confidence }}</p>
+        <p><strong>⚡ Risk Skoru:</strong> {{ risk_score }}/100</p>
+        
+        {% if risk_info %}
+        <p><strong>⚠️ Risk Kategorisi:</strong> 
+            <span class="badge bg-{{ risk_info.color }}">{{ risk_info.category }}</span>
+        </p>
+        <p><strong>💡 Öneri:</strong> {{ risk_info.advice }}</p>
+        {% endif %}
+
+        <!-- Kullanıcı bilgileri -->
+        <h5 class="mt-4">👤 Bilgileriniz:</h5>
+        <ul>
+            <li>Yaş: {{ user_info.age }}</li>
+            <li>Cilt Tipi: {{ user_info.skin_type }}</li>
+            <li>Aile Öyküsü: {{ user_info.family_history }}</li>
+        </ul>
+        
+        {% if risk_factors %}
+        <p><strong>Ek Risk Faktörleri:</strong> 
+            {% for factor in risk_factors %}
+                {% if factor == 'uv' %}
+                🌞 Güneş Maruziyeti 
+                {% elif factor == 'open_skin' %}
+                👷 Açık Hava Çalışması 
+                {% endif %}
+            {% endfor %}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="alert alert-info mt-3">
+        ⚠️ Bu sistem sadece ön değerlendirme yapar. Kesin teşhis için dermatoloji uzmanına başvurun!
+    </div>
+</div>
 </body>
 </html>
