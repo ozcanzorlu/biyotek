@@ -1,134 +1,170 @@
-import tensorflow as tf
-from flask import Flask, render_template, request
+import os
+import io
+import base64
 import numpy as np
 from PIL import Image
-import os
+import tensorflow as tf
+from flask import Flask, render_template, request
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "skin_cancer_cnn.tflite")
+TEMPLATE_FOLDER = os.path.join(BASE_DIR, "templates")
 
-# ---- MODEL ----
-interpreter = tf.lite.Interpreter(model_path="skin_cancer_cnn.tflite")
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+app = Flask(__name__, template_folder=TEMPLATE_FOLDER)
 
-# Dinamik input size alma
-input_shape = input_details[0]['shape']   # örn: [1,128,128,3]
-IMG_HEIGHT, IMG_WIDTH = input_shape[1], input_shape[2]
+# Model yükleme
+try:
+    interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+    interpreter.allocate_tensors()
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    print("✅ Model başarıyla yüklendi.")
+except Exception as e:
+    print("❌ Model yüklenemedi:", e)
 
-# Upload klasörü
-UPLOAD_FOLDER = "static/uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-# Sınıflar (Türkçe açıklamalar)
+# Türkçe hastalık sınıfları
 classes = {
-    'akiec': "Aktinik keratoz / Bowen hastalığı - Ciltte güneşe bağlı yüzeysel tümör",
-    'bcc': "Bazal Hücreli Karsinom - En sık görülen, genellikle yavaş ilerleyen cilt kanseri",
-    'bkl': "Benign Keratoz - İyi huylu deri lezyonu",
-    'df': "Dermatofibroma - Zararsız, küçük ve sert deri nodülü",
-    'mel': "Melanom - Tehlikeli ve hızlı yayılabilen cilt kanseri",
-    'nv': "Melanositik Nevüs (Ben) - Çoğunlukla iyi huylu benler",
-    'vasc': "Vasküler Lezyon - Damar kaynaklı lezyon (ör: hemanjiyom)"
+    0: {'name': 'akiec', 'desc': 'Aktinik Keratoz / Bowen Hastalığı (Orta Risk)', 'severity': 'orta'},
+    1: {'name': 'bcc', 'desc': 'Bazal Hücreli Karsinom (Yüksek Risk)', 'severity': 'yüksek'},
+    2: {'name': 'bkl', 'desc': 'Benign Keratoz (Zararsız Deri Lezyonu)', 'severity': 'düşük'},
+    3: {'name': 'df', 'desc': 'Dermatofibroma (Zararsız Deri Nodülü)', 'severity': 'düşük'},
+    4: {'name': 'mel', 'desc': 'Melanom (Kritik Risk)', 'severity': 'kritik'},
+    5: {'name': 'nv', 'desc': 'Melanositik Nevüs (Ben, Genellikle Zararsız)', 'severity': 'düşük'},
+    6: {'name': 'vasc', 'desc': 'Vasküler Lezyon (Damar Kayması)', 'severity': 'düşük'}
 }
 
-# Cilt tipi açıklamaları
-skin_types = {
-    '1': 'Tip I - Çok açık ten, kolay yanar',
-    '2': 'Tip II - Açık ten, genelde yanar',
-    '3': 'Tip III - Buğday ten, orta derecede yanar',
-    '4': 'Tip IV - Esmer ten, nadiren yanar',
-    '5': 'Tip V - Koyu esmer, nadiren yanar',
-    '6': 'Tip VI - Çok koyu ten, neredeyse hiç yanmaz'
-}
+def preprocess_image(image):
+    img = image.resize((128, 128))
+    if img.mode != 'RGB':
+        img = img.convert('RGB')
+    img_array = np.array(img).astype('float32') / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+    return img_array
 
-# --- Risk hesaplama yardımcı fonksiyonlar ---
 def calculate_age_factor(age):
-    if age < 30: return 5
-    elif age < 50: return 10
-    elif age < 70: return 15
-    else: return 20
+    if age < 30:
+        return 0.1
+    elif age < 50:
+        return 0.3
+    elif age < 70:
+        return 0.6
+    else:
+        return 1.0
 
 def calculate_skin_type_factor(skin_type):
     skin_type = int(skin_type)
-    if skin_type <= 2: return 15
-    elif skin_type <= 4: return 10
-    else: return 5
-
-def get_risk_category(risk_score):
-    if risk_score < 40:
-        return {'category': 'DÜŞÜK', 'color': 'success', 'advice': 'Düzenli kontrol yeterli (6 ayda bir önerilir).'}
-    elif risk_score < 70:
-        return {'category': 'ORTA', 'color': 'warning', 'advice': 'Dikkatli takip gerekli (3 ayda bir önerilir).'}
+    if skin_type <= 2:
+        return 1.0
+    elif skin_type <= 4:
+        return 0.6
     else:
-        return {'category': 'YÜKSEK', 'color': 'danger', 'advice': 'Acil doktora başvurunuz!'}
+        return 0.2
 
-def predict_image(img_path):
-    img = Image.open(img_path).resize((IMG_WIDTH, IMG_HEIGHT))
-    img_array = np.array(img).astype('float32') / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
+def calculate_risk_score(confidence, age, skin_type, family_history, additional_risks):
+    base_score = confidence
+    age_factor = calculate_age_factor(age)
+    skin_factor = calculate_skin_type_factor(skin_type)
+    family_factor = 1.0 if family_history == "yes" else 0.0
 
-    interpreter.set_tensor(input_details[0]['index'], img_array)
-    interpreter.invoke()
-    prediction = interpreter.get_tensor(output_details[0]['index'])
-    return np.argmax(prediction), float(np.max(prediction))
+    extra_factor = 0.0
+    if additional_risks:
+        if "sun_exposure" in additional_risks:
+            extra_factor += 0.4
+        if "outdoor_work" in additional_risks:
+            extra_factor += 0.4
+        if "solarium" in additional_risks:
+            extra_factor += 0.3
 
-# --- FLASK ROUTE ---
-@app.route('/', methods=['GET','POST'])
-def index():
-    prediction = None
-    confidence = None
-    risk_score = None
-    risk_info = None
-    img_path = None
-    user_info = {}
-    risk_factors = []   # ✅ Hata engeli: GET isteğinde varsayılan boş liste
+    personal_factor = min(age_factor + skin_factor + family_factor + extra_factor, 3.0) / 3.0
+    risk_score = (base_score * 0.7) + (personal_factor * 30)
+    return min(risk_score, 100)
 
-    if request.method == 'POST':
-        file = request.files['file']
-
-        # Form verileri
-        age = int(request.form.get('age', 25))
-        skin_type = request.form.get('skin_type', '3')
-        family_history = request.form.get('family_history', 'no')
-        risk_factors = request.form.getlist('risk_factors')
-
-        user_info = {
-            'age': age,
-            'skin_type': skin_types.get(skin_type, 'Bilinmiyor'),
-            'family_history': 'Evet' if family_history == 'yes' else 'Hayır'
+def get_risk_category(risk_score, disease_name, severity):
+    # Melanomda her zaman acil uyarı
+    if "Melanom" in disease_name:
+        return {
+            "category": "KRİTİK",
+            "color": "danger",
+            "advice": "Melanom tespit edildi! Acil dermatoloğa başvurunuz."
         }
 
-        if file and file.filename != '':
-            file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-            file.save(file_path)
+    # Zararsız hastalıklar için öneri
+    if severity == 'düşük':
+        return {
+            "category": "ZARARSIZ",
+            "color": "success",
+            "advice": "Bu lezyon genellikle zararsızdır. Düzenli takip önerilir."
+        }
 
-            # Model tahmini
-            result, conf = predict_image(file_path)
-            class_codes = list(classes.keys())
-            code = class_codes[result]
-            prediction = classes[code]
-            confidence = round(conf * 100, 2)
-            img_path = file_path
+    # Diğer hastalıklar için risk skoruna göre öneri
+    if risk_score < 40:
+        return {
+            "category": "DÜŞÜK",
+            "color": "success",
+            "advice": "Genellikle zararsızdır. Takip önerilir."
+        }
+    elif risk_score < 70:
+        return {
+            "category": "ORTA",
+            "color": "warning",
+            "advice": "Kontrol gerekebilir. Dermatoloğa başvurmanız faydalı olabilir."
+        }
+    else:
+        return {
+            "category": "YÜKSEK",
+            "color": "danger",
+            "advice": "Yüksek risk! Acil doktora başvurunuz."
+        }
 
-            # Gelişmiş risk skoru
-            risk_score = confidence
-            risk_score += calculate_age_factor(age)
-            risk_score += calculate_skin_type_factor(skin_type)
-            if family_history == "yes": risk_score += 15
-            if "uv" in risk_factors: risk_score += 5
-            if "open_skin" in risk_factors: risk_score += 5
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return render_template('index.html', error="Lütfen bir fotoğraf yükleyin.")
+        file = request.files['file']
+        if file.filename == '':
+            return render_template('index.html', error="Lütfen bir fotoğraf seçin.")
 
-            risk_score = min(risk_score, 100)  # max 100 sınırı
-            risk_info = get_risk_category(risk_score)
+        try:
+            age = int(request.form.get('age', 30))
+            skin_type = request.form.get('skin_type', '3')
+            family_history = request.form.get('family_history', 'no')
+            additional_risks = request.form.getlist('additional_risks')
 
-    return render_template('index.html',
-                           prediction=prediction,
-                           confidence=confidence,
-                           risk_score=risk_score,
-                           risk_info=risk_info,
-                           img_path=img_path,
-                           user_info=user_info,
-                           risk_factors=risk_factors)
+            image = Image.open(file.stream)
+            input_data = preprocess_image(image)
+
+            interpreter.set_tensor(input_details[0]['index'], input_data)
+            interpreter.invoke()
+            output_data = interpreter.get_tensor(output_details[0]['index'])
+
+            pred_index = np.argmax(output_data)
+            confidence = float(np.max(output_data)) * 100
+
+            disease_info = classes[pred_index]
+            risk_score = calculate_risk_score(confidence, age, skin_type, family_history, additional_risks)
+            risk_info = get_risk_category(risk_score, disease_info['desc'], disease_info['severity'])
+
+            img_buffer = io.BytesIO()
+            image.save(img_buffer, format='JPEG')
+            img_str = base64.b64encode(img_buffer.getvalue()).decode()
+
+            return render_template('index.html',
+                                   prediction=disease_info['desc'],
+                                   confidence=round(confidence, 2),
+                                   risk_score=round(risk_score, 2),
+                                   risk_category=risk_info['category'],
+                                   risk_color=risk_info['color'],
+                                   advice=risk_info['advice'],
+                                   image_data=img_str,
+                                   age=age,
+                                   skin_type=skin_type,
+                                   family_history=family_history,
+                                   additional_risks=additional_risks)
+        except Exception as e:
+            return render_template('index.html', error=f"Hata oluştu: {str(e)}")
+
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

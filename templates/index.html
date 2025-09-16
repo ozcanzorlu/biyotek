@@ -1,110 +1,87 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <title>Deri Sağlığı Analiz Sistemi</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deri Kanseri Risk Analizi</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        .risk-bar { height: 20px; border-radius: 10px; overflow: hidden; background: #e9ecef; }
+        .risk-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+    </style>
 </head>
 <body class="bg-light">
-<div class="container py-5">
-    <h2 class="text-center mb-4">🧠 Yapay Zeka Destekli Deri Sağlığı Analizi</h2>
+<div class="container py-4">
+    <h2 class="mb-4 text-center">🧠 Deri Kanseri Risk Analizi</h2>
 
-    <!-- FORM -->
-    <form method="POST" enctype="multipart/form-data" class="card p-4 shadow">
-        <!-- Fotoğraf -->
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" enctype="multipart/form-data" class="mb-4">
         <div class="mb-3">
-            <label class="form-label fw-bold">📸 Fotoğraf Yükle</label>
-            <input type="file" name="file" class="form-control" required>
+            <label for="file" class="form-label">📸 Deri Fotoğrafı Yükle</label>
+            <input type="file" class="form-control" id="file" name="file" accept="image/*" required />
         </div>
 
-        <!-- Yaş -->
         <div class="mb-3">
-            <label class="form-label fw-bold">🎂 Yaş</label>
-            <input type="number" name="age" class="form-control" placeholder="Örn: 35" min="1" max="120" required>
+            <label for="age" class="form-label">🎂 Yaş</label>
+            <input type="number" class="form-control" id="age" name="age" min="1" max="120" value="{{ age or 30 }}" required />
         </div>
 
-        <!-- Cilt Tipi -->
         <div class="mb-3">
-            <label class="form-label fw-bold">🌞 Cilt Tipi</label>
-            <select name="skin_type" class="form-select" required>
-                <option value="">Seçiniz</option>
-                <option value="1">Tip I - Çok açık ten</option>
-                <option value="2">Tip II - Açık ten</option>
-                <option value="3">Tip III - Buğday ten</option>
-                <option value="4">Tip IV - Esmer ten</option>
-                <option value="5">Tip V - Koyu esmer</option>
-                <option value="6">Tip VI - Çok koyu ten</option>
+            <label for="skin_type" class="form-label">☀️ Cilt Tipi (Fitzpatrick)</label>
+            <select class="form-select" id="skin_type" name="skin_type" required>
+                <option value="1" {% if skin_type == '1' %}selected{% endif %}>Tip I - Çok Açık Ten, Her Zaman Yanar</option>
+                <option value="2" {% if skin_type == '2' %}selected{% endif %}>Tip II - Açık Ten, Kolayca Yanar</option>
+                <option value="3" {% if skin_type == '3' %}selected{% endif %}>Tip III - Buğday Ten, Bazen Yanar</option>
+                <option value="4" {% if skin_type == '4' %}selected{% endif %}>Tip IV - Esmer Ten, Nadiren Yanar</option>
+                <option value="5" {% if skin_type == '5' %}selected{% endif %}>Tip V - Koyu Esmer, Nadiren Yanar</option>
+                <option value="6" {% if skin_type == '6' %}selected{% endif %}>Tip VI - Çok Koyu Ten, Hiç Yanmaz</option>
             </select>
         </div>
 
-        <!-- Aile öyküsü -->
         <div class="mb-3">
-            <label class="form-label fw-bold">👨‍👩‍👧‍👦 Aile Öyküsü</label>
-            <select name="family_history" class="form-select" required>
-                <option value="">Seçiniz</option>
-                <option value="yes">Evet</option>
-                <option value="no">Hayır</option>
-            </select>
+            <label class="form-label">👨‍👩‍👧 Ailede Cilt Kanseri Öyküsü</label>
+            <div>
+                <input type="radio" id="family_no" name="family_history" value="no" {% if family_history != 'yes' %}checked{% endif %} />
+                <label for="family_no">Hayır</label>
+                <input type="radio" id="family_yes" name="family_history" value="yes" {% if family_history == 'yes' %}checked{% endif %} />
+                <label for="family_yes">Evet</label>
+            </div>
         </div>
 
-        <!-- Ek riskler -->
         <div class="mb-3">
-            <label class="form-label fw-bold">⚠️ Ek Risk Faktörleri:</label><br>
-            <input type="checkbox" name="risk_factors" value="uv"> Yoğun güneş maruziyeti<br>
-            <input type="checkbox" name="risk_factors" value="open_skin"> Açık havada çalışma (tarım, inşaat vb.)
+            <label class="form-label">⚠️ Ek Risk Faktörleri</label>
+            <div>
+                <input type="checkbox" id="sun_exposure" name="additional_risks" value="sun_exposure" {% if 'sun_exposure' in additional_risks %}checked{% endif %} />
+                <label for="sun_exposure">Yoğun güneş maruziyeti</label><br/>
+                <input type="checkbox" id="outdoor_work" name="additional_risks" value="outdoor_work" {% if 'outdoor_work' in additional_risks %}checked{% endif %} />
+                <label for="outdoor_work">Açık havada çalışma</label><br/>
+                <input type="checkbox" id="solarium" name="additional_risks" value="solarium" {% if 'solarium' in additional_risks %}checked{% endif %} />
+                <label for="solarium">Solaryum kullanımı</label>
+            </div>
         </div>
 
         <button type="submit" class="btn btn-primary w-100">🔍 Analiz Et</button>
     </form>
 
-    <!-- SONUÇLAR -->
     {% if prediction %}
-    <div class="mt-5 card p-4 shadow">
-        <h4>🔬 Analiz Sonuçları</h4>
-
-        {% if img_path %}
-        <div class="mb-3">
-            <h6>📸 Yüklenen Fotoğraf:</h6>
-            <img src="{{ img_path }}" class="img-fluid rounded" style="max-height:200px;">
+    <div class="card p-3 shadow-sm">
+        <h4>📊 Sonuçlar</h4>
+        <p><strong>🧠 Tahmin:</strong> {{ prediction }}</p>
+        <p><strong>📈 Model Güveni:</strong> %{{ confidence }}</p>
+        <p><strong>🔢 Risk Skoru:</strong> {{ risk_score }}/100</p>
+        <div class="risk-bar mb-3">
+            <div class="risk-fill bg-{{ risk_color }}" style="width: {{ risk_score }}%;"></div>
         </div>
-        {% endif %}
-
-        <p><strong>📋 Tahmin:</strong> {{ prediction }}</p>
-        <p><strong>🎯 Model Güveni:</strong> %{{ confidence }}</p>
-        <p><strong>⚡ Risk Skoru:</strong> {{ risk_score }}/100</p>
-        
-        {% if risk_info %}
-        <p><strong>⚠️ Risk Kategorisi:</strong> 
-            <span class="badge bg-{{ risk_info.color }}">{{ risk_info.category }}</span>
-        </p>
-        <p><strong>💡 Öneri:</strong> {{ risk_info.advice }}</p>
-        {% endif %}
-
-        <!-- Kullanıcı bilgileri -->
-        <h5 class="mt-4">👤 Bilgileriniz:</h5>
-        <ul>
-            <li>Yaş: {{ user_info.age }}</li>
-            <li>Cilt Tipi: {{ user_info.skin_type }}</li>
-            <li>Aile Öyküsü: {{ user_info.family_history }}</li>
-        </ul>
-        
-        {% if risk_factors %}
-        <p><strong>Ek Risk Faktörleri:</strong> 
-            {% for factor in risk_factors %}
-                {% if factor == 'uv' %}
-                🌞 Güneş Maruziyeti 
-                {% elif factor == 'open_skin' %}
-                👷 Açık Hava Çalışması 
-                {% endif %}
-            {% endfor %}
-        </p>
-        {% endif %}
+        <p><strong>🏷️ Kategori:</strong> <span class="badge bg-{{ risk_color }}">{{ risk_category }}</span></p>
+        <p><strong>💡 Öneri:</strong> {{ advice }}</p>
+        <div>
+            <img src="data:image/jpeg;base64,{{ image_data }}" alt="Yüklenen Fotoğraf" class="img-fluid rounded" style="max-height: 300px;" />
+        </div>
     </div>
     {% endif %}
-
-    <div class="alert alert-info mt-3">
-        ⚠️ Bu sistem sadece ön değerlendirme yapar. Kesin teşhis için dermatoloji uzmanına başvurun!
-    </div>
 </div>
 </body>
 </html>
